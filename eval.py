@@ -59,28 +59,40 @@ Answer: ABCD
 
 
 def init_hf_llm(model_id: str):
-    # check transformers and torch installation
     try:
-        import transformers
+        from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
     except ImportError:
         raise ImportError("Please install transformers with `pip install transformers`")
+    
     try:
         import torch
-
         flash_attn_enable = torch.cuda.get_device_capability()[0] >= 8
     except ImportError:
         raise ImportError("Please install torch with `pip install torch`")
 
-    # todo: add flash_attn_enable to the model_kwargs
+    # Load tokenizer and set padding side to 'left'
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    tokenizer.padding_side = 'left'  # Set padding side to left
 
-    llm = HuggingFacePipeline.from_model_id(
-        model_id=model_id,
-        task="text-generation",
-        pipeline_kwargs={"max_new_tokens": 5},
-        device=0,
-        model_kwargs={"trust_remote_code": True, "torch_dtype": torch.bfloat16},
-    )
+    # If pad_token_id is not set, set it to eos_token_id (or another token)
+    if tokenizer.pad_token_id is None:
+        tokenizer.pad_token_id = tokenizer.eos_token_id  # You can assign another token ID if you prefer
+
+    # Load model
+    model = AutoModelForCausalLM.from_pretrained(model_id, 
+                                                 trust_remote_code=True, 
+                                                 torch_dtype=torch.bfloat16)
+
+    # Create HuggingFace pipeline with the updated tokenizer
+    llm = HuggingFacePipeline(pipeline=pipeline("text-generation", 
+                                                model=model, 
+                                                tokenizer=tokenizer, 
+                                                device=0, 
+                                                max_new_tokens=5))
+
     return llm
+
+
 
 
 def init_textgen_llm(model_id: str):
