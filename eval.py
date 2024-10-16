@@ -170,9 +170,8 @@ async def batch_inference_dataset(
         else:
             batch[idx]["llm_input"] = llm_inputs[idx]
         batch[idx]["llm_output"] = llm_output
-        batch[idx]["llm_answer"] = "".join(
-            sorted(list(set(re.findall(r"[A-D]", llm_output))))
-        )
+        match = re.search(r"[A-D]", llm_output)
+        batch[idx]["llm_answer"] = match.group(0) if match else "Invalid"
         batch[idx]["score"] = int(
             batch[idx]["llm_answer"].lower() == batch[idx]["answer"].lower()
         )
