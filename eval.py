@@ -38,6 +38,7 @@ logger.addHandler(logging.FileHandler(f"./eval-{int(time.time())}.log", "w"))
 instruction = (
     "Below are multiple-choice questions concerning cybersecurity. "
     "Please select the correct answer and respond with only a single letter: A, B, C, or D. "
+    "Your response should be a **single letter**, and not a combination of letters, representing the correct answer (A, B, C, or D)."
     "Your response should only include one letter, representing your choice. For example, if the answer is A, simply respond with 'A'."
 )
 
