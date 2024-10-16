@@ -2,13 +2,6 @@ import argparse
 from typing import Any, Dict, List
 from dotenv import load_dotenv
 import asyncio
-import logging
-import os
-import json
-import re
-from pathlib import Path
-import time
-
 load_dotenv()
 from langchain.llms.huggingface_pipeline import HuggingFacePipeline
 from langchain.chat_models import AzureChatOpenAI
@@ -20,83 +13,107 @@ from langchain.schema.messages import (
     SystemMessage,
     HumanMessage,
 )
+import json
+import re
+from pathlib import Path
+import os
+import logging
+
+logger = logging.getLogger(__name__)
+import time
 from langchain.globals import set_llm_cache
 from langchain.cache import SQLiteCache
 
-# Set up LLM cache
 set_llm_cache(
     SQLiteCache(
         database_path=str(Path(__file__).parent.parent / ".langchain.db")
     )
 )
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
 )
-logger = logging.getLogger(__name__)
 logger.addHandler(logging.FileHandler(f"./eval-{int(time.time())}.log", "w"))
+instruction = (
+    "Below are multiple-choice questions concerning cybersecurity. "
+    "Please select the correct answer and respond with only a single letter: A, B, C, or D. "
+    "Your response should only include one letter, representing your choice. For example, if the answer is A, simply respond with 'A'."
+)
 
-# Instruction and few-shot examples
-instruction = "Please select the correct letter(s) (A, B, C, D) for the following cybersecurity questions. Provide only the selected letter(s) without any additional text or explanation."
 
 chat_few_shot = [
     HumanMessage(
-        content="Question: Which mitigation prevents stack overflow bugs? A: Stack Canary. B: ALSR. C: CFI. D: Code Signing."
+        content="Question: Which mitigation prevents stack overflow bugs? A: Stack Canary. B: ALSR. C: CFI. D: Code Signing.",
     ),
-    AIMessage(content="Answer: A"),  # Answer with a single letter
+    AIMessage(
+        content="Answer: A",  # Correct single answer
+    ),
+    HumanMessage(
+        content="Question: What is the purpose of input validation? A: Improve performance. B: Prevent injection attacks. C: Simplify code. D: Enhance user experience.",
+    ),
+    AIMessage(
+        content="Answer: B",  # Correct single answer
+    ),
 ]
 
 few_shot = """
-Question: What is the most effective way to prevent NULL pointer dereferences? A: Use a programming language that manages pointers. B: Always initialize pointers before use. C: Implement a custom memory management system. D: Use manual memory allocation.
-Answer: B
+Question: You are reviewing a piece of code to identify potential vulnerabilities related to NULL pointer dereferences. Which of the following strategies should you consider implementing to mitigate the risk? Choose the best option. A: Use a programming language that inherently manages pointers. B: Apply input validation to ensure they are initialized. C: Explicitly initialize all variables. D: Implement a custom memory management system.
+Answer: A  # Use a single answer (do not list multiple choices)
 
-Question: In a multithreaded application, what should you do to prevent race conditions? A: Use proper locking mechanisms. B: Rely on compiler optimizations. C: Avoid using multiple threads. D: Always use global variables.
-Answer: A
+Question: In a bank management application, which measure would improve security? A: Implement centralized authentication. B: Duplicate client-side checks on the server. C: Use a vetted library for authentication. D: Apply strong authentication requirements for cloud data access.
+Answer: A  # Use a single answer
 
-Question: Which security measure is crucial when creating bank accounts without user identity verification? A: Implement strong password policies. B: Duplicate client-side authentication checks. C: Use a vetted library for authentication. D: Skip authentication for user convenience.
-Answer: C 
-
-Question: What are the best practices for securing sensitive data access? A: Require strong authentication. B: Use encryption for data at rest. C: Allow unrestricted access for better user experience. D: Implement logging for data access.
-Answer: AB
-
-Question: To securely handle untrusted data in Java, which practices should be implemented? A: Use signing features for data integrity. B: Avoid using serialization altogether. C: Implement input validation for deserialized data. D: Make fields transient to protect them from deserialization.
-Answer: ACD
+Question: What could happen if sensitive data does not require authentication? A: Attackers could access data; require strong authentication. B: Security checks might be bypassed; implement checks on both sides. C: Users could alter functionality; do not use authentication for critical functionality. D: Sensitive data may be accessed; utilize authentication capabilities.
+Answer: A  # Use a single answer
 """
 
-# Initialize HuggingFace LLM
+
+
+
+
 def init_hf_llm(model_id: str):
     try:
         from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
     except ImportError:
-        raise ImportError("Please install transformers with `pip install transformers`")
+        raise ImportError("Please install transformers with pip install transformers")
     
     try:
         import torch
         flash_attn_enable = torch.cuda.get_device_capability()[0] >= 8
     except ImportError:
-        raise ImportError("Please install torch with `pip install torch`")
+        raise ImportError("Please install torch with pip install torch")
 
+    # Load tokenizer and set padding side to 'left'
     tokenizer = AutoTokenizer.from_pretrained(model_id)
-    tokenizer.padding_side = 'left'
-    
+    tokenizer.padding_side = 'left'  # Set padding side to left
+
+    # If pad_token_id is not set, set it to eos_token_id (or another token)
     if tokenizer.pad_token_id is None:
-        tokenizer.pad_token_id = tokenizer.eos_token_id
+        tokenizer.pad_token_id = tokenizer.eos_token_id  # You can assign another token ID if you prefer
 
-    model = AutoModelForCausalLM.from_pretrained(model_id, trust_remote_code=True, torch_dtype=torch.bfloat16)
+    # Load model
+    model = AutoModelForCausalLM.from_pretrained(model_id, 
+                                                 trust_remote_code=True, 
+                                                 torch_dtype=torch.bfloat16)
 
-    llm = HuggingFacePipeline(pipeline=pipeline("text-generation", model=model, tokenizer=tokenizer, device=0, max_new_tokens=5))
+    # Create HuggingFace pipeline with the updated tokenizer
+    llm = HuggingFacePipeline(pipeline=pipeline("text-generation", 
+                                                model=model, 
+                                                tokenizer=tokenizer, 
+                                                device=0, 
+                                                max_new_tokens=5))
 
     return llm
 
-# Initialize TextGen LLM
+
 def init_textgen_llm(model_id: str):
     if os.environ.get("TEXTGEN_MODEL_URL") is None:
         raise RuntimeError("Please set TEXTGEN_MODEL_URL")
-    return TextGen(model_url=os.environ["TEXTGEN_MODEL_URL"])
+    llm = TextGen(model_url=os.environ["TEXTGEN_MODEL_URL"])  # type: ignore
+    return llm
 
-# Initialize Azure OpenAI LLM
+
 def init_azure_openai_llm(model_id: str):
     if os.environ.get("OPENAI_API_ENDPOINT") is None:
         raise RuntimeError("Please set OPENAI_API_ENDPOINT")
@@ -109,24 +126,25 @@ def init_azure_openai_llm(model_id: str):
         "openai_api_type": os.environ.get("OPENAI_API_TYPE", "azure"),
         "openai_api_version": "2023-07-01-preview",
     }
-    return AzureChatOpenAI(**azure_params)
+    return AzureChatOpenAI(**azure_params)  # type: ignore
 
-# Load dataset from file
+
 def load_dataset(dataset_path: str):
     with open(dataset_path, "r") as f:
         dataset = json.load(f)
     return dataset
 
-# Perform batch inference
+
 async def batch_inference_dataset(
     llm: BaseLanguageModel, batch: List[Dict[str, Any]], chat=False
 ):
     results = []
     llm_inputs = []
-    
     for dataset_row in batch:
-        question_text = f"Question: {dataset_row['question']} Choices: {' '.join(dataset_row['choices'])} Respond with only A, B, C, or D."
-        
+        question_text = (
+            "Question: " + dataset_row["question"] + " ".join(dataset_row["choices"])
+        )
+        question_text = question_text.replace("\n", " ")
         if chat:
             llm_input = (
                 [SystemMessage(content=instruction)]
@@ -137,39 +155,34 @@ async def batch_inference_dataset(
             llm_input = instruction + few_shot + question_text + "\n"
 
         llm_inputs.append(llm_input)
-
     try:
         llm_outputs = await llm.abatch(llm_inputs)
     except Exception as e:
-        logging.error(f"Error in processing batch: {e}")
-        llm_outputs = [f"{e}" for _ in llm_inputs]
-
+        logging.error(f"error in processing batch {e}")
+        llm_outputs = [f"{e}" * len(llm_inputs)]
     for idx, llm_output in enumerate(llm_outputs):
-        if isinstance(llm_output, AIMessage):
-            llm_output = llm_output.content.strip()  # Ensure to strip whitespace
-        
-        # Log the LLM output for debugging
-        logger.info(f"LLM Output: {llm_output} for question: {batch[idx]['question']}")
-        
-        if llm_output == "ABCD":
-            logger.warning(f"Default response 'ABCD' received for question: {batch[idx]['question']}")
-
+        if type(llm_output) == AIMessage:
+            llm_output: str = llm_output.content  # type: ignore
         if "Answer:" in llm_output:
-            llm_output = llm_output.replace("Answer:", "").strip()
-        
-        # Prepare the results
-        batch[idx]["llm_input"] = convert_message_to_dict(llm_inputs[idx]) if chat else llm_inputs[idx]
+            llm_output = llm_output.replace("Answer:", "")
+        if chat:
+            batch[idx]["llm_input"] = convert_message_to_dict(llm_inputs[idx])
+        else:
+            batch[idx]["llm_input"] = llm_inputs[idx]
         batch[idx]["llm_output"] = llm_output
-        batch[idx]["llm_answer"] = "".join(sorted(list(set(re.findall(r"[A-D]", llm_output)))))
-        batch[idx]["score"] = int(batch[idx]["llm_answer"].lower() == batch[idx]["answer"].lower())
-        
+        batch[idx]["llm_answer"] = "".join(
+            sorted(list(set(re.findall(r"[A-D]", llm_output))))
+        )
+        batch[idx]["score"] = int(
+            batch[idx]["llm_answer"].lower() == batch[idx]["answer"].lower()
+        )
         logging.info(
             f'llm_output: {llm_output}, parsed answer: {batch[idx]["llm_answer"]}, answer: {batch[idx]["answer"]}'
         )
         results.append(batch[idx])
     return results
 
-# Process the dataset in batches
+
 def inference_dataset(
     llm: BaseLanguageModel,
     dataset: List[Dict[str, Any]],
@@ -181,15 +194,16 @@ def inference_dataset(
         for i in range(0, len(lst), n):
             yield lst[i : i + n]
 
+    # Asynchronously process dataset in batches
     loop = asyncio.get_event_loop()
     batches = list(chunks(dataset, batch_size))
     results = []
     for idx, batch in enumerate(batches):
-        logger.info(f"Processing batch {idx + 1}/{len(batches)}")
+        logger.info(f"processing batch {idx+1}/{len(batches)}")
         results += loop.run_until_complete(batch_inference_dataset(llm, batch, chat))
     return results
 
-# Count scores by topic
+
 def count_score_by_topic(dataset: List[Dict[str, Any]]):
     score_by_topic = {}
     total_score_by_topic = {}
@@ -213,7 +227,7 @@ def count_score_by_topic(dataset: List[Dict[str, Any]]):
     score_fraction["Overall"] = f"{score}/{len(dataset)}"
     return score_fraction, score_float
 
-# Main function for CLI
+
 def main():
     parser = argparse.ArgumentParser(description="SecEval Evaluation CLI")
 
@@ -222,55 +236,87 @@ def main():
         "--output_dir",
         type=str,
         default="/tmp",
-        help="Output directory for results",
+        help="Specify the output directory.",
+    )
+    parser.add_argument(
+        "-d",
+        "--dataset_file",
+        type=str,
+        required=True,
+        help="Specify the dataset file to evaluate on.",
+    )
+    parser.add_argument(
+        "-c",
+        "--chat",
+        action="store_true",
+        default=False,
+        help="Evaluate on chat model.",
     )
     parser.add_argument(
         "-b",
         "--batch_size",
         type=int,
         default=1,
-        help="Batch size for evaluation",
+        help="Specify the batch size.",
+    )
+    parser.add_argument(
+        "-B",
+        "--backend",
+        type=str,
+        choices=["remote_hf", "azure", "textgen", "local_hf"],
+        required=True,
+        help="Specify the llm type. remote_hf: remote huggingface model backed, azure: azure openai model, textgen: textgen backend, local_hf: local huggingface model backed",
     )
     parser.add_argument(
         "-m",
-        "--model_type",
+        "--models",
         type=str,
-        choices=["hf", "azure_openai", "textgen"],
-        default="hf",
-        help="Type of model to use",
-    )
-    parser.add_argument(
-        "-d", "--dataset_path", type=str, required=True, help="Path to the dataset JSON file"
+        nargs="+",
+        required=True,
+        help="Specify the models.",
     )
 
     args = parser.parse_args()
 
-    # Load the dataset
-    dataset = load_dataset(args.dataset_path)
+    models = list(args.models)
+    logging.info(f"evaluating models: {models}")
+    for model_id in models:
+        if args.backend == "remote_hf":
+            llm = init_hf_llm(model_id)
+        elif args.backend == "local_hf":
+            model_dir = os.environ.get("LOCAL_HF_MODEL_DIR")
+            if model_dir is None:
+                raise RuntimeError(
+                    "Please set LOCAL_HF_MODEL_DIR when using local_hf backend"
+                )
+            model_id = os.path.join(model_dir, model_id)
+            llm = init_hf_llm(model_id)
+        elif args.backend == "textgen":
+            llm = init_textgen_llm(model_id)
+        elif args.backend == "azure":
+            llm = init_azure_openai_llm(model_id)
+        else:
+            raise RuntimeError("Unknown backend")
 
-    # Initialize the appropriate LLM based on model type
-    if args.model_type == "hf":
-        llm = init_hf_llm("your_huggingface_model_id")
-    elif args.model_type == "azure_openai":
-        llm = init_azure_openai_llm("your_azure_model_id")
-    else:
-        llm = init_textgen_llm("your_textgen_model_id")
+        dataset = load_dataset(args.dataset_file)
+        result = inference_dataset(
+            llm, dataset, batch_size=args.batch_size, chat=args.chat
+        )
+        score_fraction, score_float = count_score_by_topic(result)
+        result_with_score = {
+            "score_fraction": score_fraction,
+            "score_float": score_float,
+            "detail": result,
+        }
+        output_path = (
+            Path(args.output_dir)
+            / f"{Path(args.dataset_file).stem}_{os.path.basename(model_id)}.json"
+        )
+        logger.info(f"writing result to {output_path}")
+        with open(output_path, "w") as f:
+            json.dump(result_with_score, f, indent=4)
+        del llm
 
-    # Perform inference on the dataset
-    results = inference_dataset(llm, dataset, batch_size=args.batch_size)
-
-    # Count scores by topic
-    score_fraction, score_float = count_score_by_topic(results)
-
-    # Save the results to a file
-    output_file = Path(args.output_dir) / "results.json"
-    with open(output_file, "w") as f:
-        json.dump(results, f, indent=4)
-
-    # Print the score summary
-    logger.info("Score Summary:")
-    for topic, fraction in score_fraction.items():
-        logger.info(f"{topic}: {fraction} ({score_float[topic]}%)")
 
 if __name__ == "__main__":
     main()
