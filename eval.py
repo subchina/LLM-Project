@@ -164,6 +164,9 @@ async def batch_inference_dataset(
     for idx, llm_output in enumerate(llm_outputs):
         if type(llm_output) == AIMessage:
             llm_output: str = llm_output.content  # type: ignore
+            
+            logging.info(f"Raw LLM Output: {llm_output}")
+            
         if "Answer:" in llm_output:
             llm_output = llm_output.replace("Answer:", "")
         if chat:
