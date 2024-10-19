@@ -1,15 +1,14 @@
 # "generate_questions.py" 
-# This file handles the use of the GPT-4o-mini model to generate prompts from CVE summaries
+# This file handles the use of the GPT-4o-mini model to generate prompts from CWE summaries
 # Author: Andjela Matic (S5248736)
 
 import pandas as pd
 from openai import OpenAI
 
 # Initialize the OpenAI client
-client = OpenAI(api_key="") # Private API key is placed here
-
+client = OpenAI(api_key="") # Insert API key here
 # Load the CSV file
-df = pd.read_csv('cve_filtered.csv', encoding='latin-1', encoding_errors="ignore")
+df = pd.read_csv('cwe_filtered.csv', encoding='latin-1', encoding_errors="ignore")
 
 # Add a column for the questions
 df['Generated Question'] = None
@@ -32,7 +31,7 @@ for index, row in df.iterrows():
     df.at[index, 'Generated Question'] = question
     
     # Save the current row to CSV iteratively
-    df.iloc[[index]].to_csv('cve_filtered_and_questions.csv', mode='a', header=(index == 0), index=False)
+    df.iloc[[index]].to_csv('cwe_filtered_and_questions.csv', mode='a', header=(index == 0), index=False)
     # Print statement to keep track of current index
     print("Question " + str(index + 1) + " added.")
 
