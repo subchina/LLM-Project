@@ -38,35 +38,17 @@ logger.addHandler(logging.FileHandler(f"./eval-{int(time.time())}.log", "w"))
 instruction = (
     "Below are multiple-choice questions concerning cybersecurity. "
     "Please select the correct answer and respond with only a single letter: A, B, C, or D. "
-    "Your response should be a **single letter**, and not a combination of letters, representing the correct answer (A, B, C, or D)."
-    "Your response should only include one letter, representing your choice. For example, if the answer is A, simply respond with 'A'."
+    "If the question allows for multiple correct answers, respond with all applicable letters in alphabetical order (e.g., AB, CD). "
+    "Your response should be a **single letter or letters**, and not a combination of letters representing the correct answer. "
+    "For example, if the answer is A, simply respond with 'A'; if both A and B are correct, respond with 'AB'. "
+    "Do not repeat the questions, your answer should only contain a letter and a letter only, the correct answer to the question."
 )
 
 
 chat_few_shot = [
-    HumanMessage(
-        content="Question: Which mitigation prevents stack overflow bugs? A: Stack Canary. B: ALSR. C: CFI. D: Code Signing.",
-    ),
-    AIMessage(
-        content="Answer: A",  # Correct single answer
-    ),
-    HumanMessage(
-        content="Question: What is the purpose of input validation? A: Improve performance. B: Prevent injection attacks. C: Simplify code. D: Enhance user experience.",
-    ),
-    AIMessage(
-        content="Answer: B",  # Correct single answer
-    ),
 ]
 
 few_shot = """
-Question: You are reviewing a piece of code to identify potential vulnerabilities related to NULL pointer dereferences. Which of the following strategies should you consider implementing to mitigate the risk? Choose the best option. A: Use a programming language that inherently manages pointers. B: Apply input validation to ensure they are initialized. C: Explicitly initialize all variables. D: Implement a custom memory management system.
-Answer: A  # Use a single answer (do not list multiple choices)
-
-Question: In a bank management application, which measure would improve security? A: Implement centralized authentication. B: Duplicate client-side checks on the server. C: Use a vetted library for authentication. D: Apply strong authentication requirements for cloud data access.
-Answer: A  # Use a single answer
-
-Question: What could happen if sensitive data does not require authentication? A: Attackers could access data; require strong authentication. B: Security checks might be bypassed; implement checks on both sides. C: Users could alter functionality; do not use authentication for critical functionality. D: Sensitive data may be accessed; utilize authentication capabilities.
-Answer: A  # Use a single answer
 """
 
 
@@ -156,19 +138,27 @@ async def batch_inference_dataset(
             llm_input = instruction + few_shot + question_text + "\n"
 
         llm_inputs.append(llm_input)
+
     try:
         llm_outputs = await llm.abatch(llm_inputs)
     except Exception as e:
         logging.error(f"error in processing batch {e}")
         llm_outputs = [f"{e}" * len(llm_inputs)]
+
     for idx, llm_output in enumerate(llm_outputs):
         if type(llm_output) == AIMessage:
             llm_output: str = llm_output.content  # type: ignore
             
         logging.info(f"Raw LLM Output: {llm_output}")
-            
-        if "Answer:" in llm_output:
-            llm_output = llm_output.replace("Answer:", "")
+
+        # Modify extraction logic to focus on the last line of the output
+        llm_output_lines = llm_output.strip().split("\n")
+        if llm_output_lines:
+            last_line = llm_output_lines[-1]  # Get the last line of output
+            answer_match = re.search(r'([A-D]+)', last_line)  # Look for A-D in the last line
+            if answer_match:
+                llm_output = answer_match.group(1).strip()  # Take the group that matches
+
         if chat:
             batch[idx]["llm_input"] = convert_message_to_dict(llm_inputs[idx])
         else:
@@ -184,6 +174,7 @@ async def batch_inference_dataset(
         )
         results.append(batch[idx])
     return results
+
 
 
 def inference_dataset(
