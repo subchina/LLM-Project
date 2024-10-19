@@ -151,29 +151,35 @@ async def batch_inference_dataset(
             
         logging.info(f"Raw LLM Output: {llm_output}")
 
-        # Modify extraction logic to focus on the last line of the output
-        llm_output_lines = llm_output.strip().split("\n")
-        if llm_output_lines:
-            last_line = llm_output_lines[-1]  # Get the last line of output
-            answer_match = re.search(r'([A-D]+)', last_line)  # Look for A-D in the last line
-            if answer_match:
-                llm_output = answer_match.group(1).strip()  # Take the group that matches
+        # Modify extraction logic to look for "Answer:" in the output
+        answer_match = re.search(r'Answer:\s*([A-D]+)', llm_output)
+
+        if answer_match:
+            llm_output = answer_match.group(1).strip()  # Take the group that matches
+
+        # Capture all letters if they are present
+        multi_letter_match = re.search(r'^[A-D]+$', llm_output)
+
+        if multi_letter_match:
+            llm_output = multi_letter_match.group(0).strip()  # All applicable letters
 
         if chat:
             batch[idx]["llm_input"] = convert_message_to_dict(llm_inputs[idx])
         else:
             batch[idx]["llm_input"] = llm_inputs[idx]
+
         batch[idx]["llm_output"] = llm_output
-        match = re.search(r"[A-D]", llm_output)
+        match = re.search(r"[A-D]+", llm_output)
         batch[idx]["llm_answer"] = match.group(0) if match else "Invalid"
         batch[idx]["score"] = int(
-            batch[idx]["llm_answer"].lower() == batch[idx]["answer"].lower()
-        )
+            set(batch[idx]["llm_answer"]) == set(batch[idx]["answer"])
+        )  # Compare sets for multiple letters
         logging.info(
             f'llm_output: {llm_output}, parsed answer: {batch[idx]["llm_answer"]}, answer: {batch[idx]["answer"]}'
         )
         results.append(batch[idx])
     return results
+
 
 
 
