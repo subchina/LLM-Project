@@ -1,5 +1,5 @@
 # "convert_data.py"
-# This file handles processing of data after generating questions
+# This file prepares the dataset for JSON conversion
 # Author: Andjela Matic (S5248736)
 
 import pandas as pd
