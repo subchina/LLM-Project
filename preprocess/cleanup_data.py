@@ -20,5 +20,3 @@ ordered_df = pd.merge(df[['CWE-ID', 'DESCRIPTION']], cwe_filtered,
                       on=['CWE-ID', 'DESCRIPTION'], how='left')
 
 df.to_csv('cwe_filtered_and_questions_matched.csv', index=False)
-
-
