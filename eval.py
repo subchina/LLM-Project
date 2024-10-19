@@ -37,11 +37,10 @@ logging.basicConfig(
 logger.addHandler(logging.FileHandler(f"./eval-{int(time.time())}.log", "w"))
 instruction = (
     "Below are multiple-choice questions concerning cybersecurity. "
-    "Please select the correct answer and respond with only a single letter: A, B, C, or D. "
+    "Please select the correct answer and respond with: A, B, C, or D. "
     "If the question allows for multiple correct answers, respond with all applicable letters in alphabetical order (e.g., AB, CD). "
-    "Your response should be a **single letter or letters**, and not a combination of letters representing the correct answer. "
-    "For example, if the answer is A, simply respond with 'A'; if both A and B are correct, respond with 'AB'. "
-    "Do not repeat the questions, your answer should only contain a letter and a letter only, the correct answer to the question."
+    "For example, if the answer is A, simply respond with 'Answer: A'; if both A and B are correct, respond with 'Answer: AB'. "
+    "Make sure to answer the question by picking one of the options and using markdown triple backticks, like in the following example:''' Answer: D '''. If it is not in the roght format the answer will be considered wrong."
 )
 
 
