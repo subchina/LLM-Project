@@ -116,6 +116,8 @@ def load_dataset(dataset_path: str):
     return dataset
 
 
+import json  # Assuming you save the output in JSON format
+
 async def batch_inference_dataset(
     llm: BaseLanguageModel, batch: List[Dict[str, Any]], chat=False
 ):
@@ -155,21 +157,22 @@ async def batch_inference_dataset(
 
         if answer_match:
             # We take the last match to ensure we capture the correct one
-            llm_output = answer_match[-1].strip()
+            parsed_answer = answer_match[-1].strip()
 
         # Clean output by matching only valid letters (A-D)
-        multi_letter_match = re.search(r'^[A-D]+$', llm_output)
+        multi_letter_match = re.search(r'^[A-D]+$', parsed_answer)
 
         if multi_letter_match:
-            llm_output = multi_letter_match.group(0).strip()
+            parsed_answer = multi_letter_match.group(0).strip()
 
         if chat:
             batch[idx]["llm_input"] = convert_message_to_dict(llm_inputs[idx])
         else:
             batch[idx]["llm_input"] = llm_inputs[idx]
 
-        batch[idx]["llm_output"] = llm_output
-        match = re.search(r"[A-D]+", llm_output)
+        batch[idx]["llm_output"] = llm_output  # Adding raw LLM output to the result
+        batch[idx]["parsed_answer"] = parsed_answer  # Adding the parsed answer
+        match = re.search(r"[A-D]+", parsed_answer)
         batch[idx]["llm_answer"] = match.group(0) if match else "Invalid"
         batch[idx]["score"] = int(
             set(batch[idx]["llm_answer"]) == set(batch[idx]["answer"])
@@ -178,7 +181,13 @@ async def batch_inference_dataset(
             f'llm_output: {llm_output}, parsed answer: {batch[idx]["llm_answer"]}, answer: {batch[idx]["answer"]}'
         )
         results.append(batch[idx])
+
+    # Save results to a file
+    with open('output_with_llm_output.json', 'w') as outfile:
+        json.dump(results, outfile, indent=4)  # Save with pretty JSON format
+
     return results
+
 
 
 
