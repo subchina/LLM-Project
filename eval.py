@@ -149,17 +149,19 @@ async def batch_inference_dataset(
             
         logging.info(f"Raw LLM Output: {llm_output}")
 
-        # Modify extraction logic to look for "Answer:" in the output
-        answer_match = re.search(r'Answer:\s*([A-D]+)', llm_output)
+        # New logic to ensure we extract the last "Answer: [x]"
+        # Using regex to match and extract the final "Answer: [x]"
+        answer_match = re.findall(r'Answer:\s*([A-D]+)', llm_output)
 
         if answer_match:
-            llm_output = answer_match.group(1).strip()  # Take the group that matches
+            # We take the last match to ensure we capture the correct one
+            llm_output = answer_match[-1].strip()
 
-        # Capture all letters if they are present
+        # Clean output by matching only valid letters (A-D)
         multi_letter_match = re.search(r'^[A-D]+$', llm_output)
 
         if multi_letter_match:
-            llm_output = multi_letter_match.group(0).strip()  # All applicable letters
+            llm_output = multi_letter_match.group(0).strip()
 
         if chat:
             batch[idx]["llm_input"] = convert_message_to_dict(llm_inputs[idx])
@@ -177,6 +179,8 @@ async def batch_inference_dataset(
         )
         results.append(batch[idx])
     return results
+
+
 
 
 
