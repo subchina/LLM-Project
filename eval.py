@@ -80,11 +80,11 @@ def init_hf_llm(model_id: str):
     adapter_path = os.path.join(base_dir, "adapter_config.json")
       # List contents of the base directory
     print("Contents of base directory:")
-    print(os.listdir(base_dir))
+    #print(os.listdir(base_dir))
 
     # Check if adapter path exists and is accessible
-    print(f"Adapter exists: {os.path.isfile(adapter_path)}")
-    print(f"Adapter path is accessible: {os.access(adapter_path, os.R_OK)}")
+    #print(f"Adapter exists: {os.path.isfile(adapter_path)}")
+    #print(f"Adapter path is accessible: {os.access(adapter_path, os.R_OK)}")
 
     print(adapter_path)
     # Check if adapter_path is provided and exists, then apply PEFT adapter
