@@ -300,7 +300,7 @@ def main():
                 raise RuntimeError(
                     "Please set LOCAL_HF_MODEL_DIR when using local_hf backend"
                 )
-            model_id = os.path.join(model_dir, model_id)
+            #model_id = os.path.join(model_dir, model_id)
             llm = init_hf_llm(model_id)
         elif args.backend == "textgen":
             llm = init_textgen_llm(model_id)
