@@ -75,16 +75,33 @@ def init_hf_llm(model_id: str):
 
     # Load model
     base_model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.bfloat16)
-    adapter_path = os.path.join(model_id, "adapter_config.json")
+    
+    base_dir = os.path.abspath(model_id)  # Convert to absolute path
+    adapter_path = os.path.join(base_dir, "adapter_config.json")
+      # List contents of the base directory
+    print("Contents of base directory:")
+    print(os.listdir(base_dir))
 
+    # Check if adapter path exists and is accessible
+    print(f"Adapter exists: {os.path.isfile(adapter_path)}")
+    print(f"Adapter path is accessible: {os.access(adapter_path, os.R_OK)}")
+
+    print(adapter_path)
     # Check if adapter_path is provided and exists, then apply PEFT adapter
-    if adapter_path and os.path.isdir(adapter_path):
+    if adapter_path and os.path.isfile(adapter_path):
         try:
             from peft import PeftModel  # Importing only if needed
-            model = PeftModel.from_pretrained(base_model, adapter_path)
+            model = PeftModel.from_pretrained(base_model, base_dir)
             print("Loaded model with PEFT adapter.")
+            model.config.architectures = ["AutoModelForCausalLM"]
+            print(model.config)
+            print("Model State Dict Keys:", list(model.state_dict().keys()))
+
         except ImportError:
             raise ImportError("Please install peft with `pip install peft` to use adapters.")
+        except Exception as e:
+            print(f"Error loading adapter: {e}")
+            model = base_model  
     else:
         model = base_model
         print("Loaded base model without adapter.")
