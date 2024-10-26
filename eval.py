@@ -74,10 +74,19 @@ def init_hf_llm(model_id: str):
         tokenizer.pad_token_id = tokenizer.eos_token_id  # You can assign another token ID if you prefer
 
     # Load model
-    model = AutoModelForCausalLM.from_pretrained(model_id, 
-                                                 trust_remote_code=True, 
-                                                 torch_dtype=torch.bfloat16)
-
+    base_model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.bfloat16)
+    
+    # Check if adapter_path is provided and exists, then apply PEFT adapter
+    if adapter_path and os.path.isdir(adapter_path):
+        try:
+            from peft import PeftModel  # Importing only if needed
+            model = PeftModel.from_pretrained(base_model, adapter_path)
+            print("Loaded model with PEFT adapter.")
+        except ImportError:
+            raise ImportError("Please install peft with `pip install peft` to use adapters.")
+    else:
+        model = base_model
+        print("Loaded base model without adapter.")
     # Create HuggingFace pipeline with the updated tokenizer
     llm = HuggingFacePipeline(pipeline=pipeline("text-generation", 
                                                 model=model, 
