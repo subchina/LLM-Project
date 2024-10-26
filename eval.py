@@ -75,7 +75,8 @@ def init_hf_llm(model_id: str):
 
     # Load model
     base_model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.bfloat16)
-    
+    adapter_path = os.path.join(model_id, "adapter_config.json")
+
     # Check if adapter_path is provided and exists, then apply PEFT adapter
     if adapter_path and os.path.isdir(adapter_path):
         try:
